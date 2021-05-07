@@ -5,6 +5,7 @@ describe('PubSub', () => {
 
   describe('subscribe', () => {
     beforeEach(function () {
+      jasmine.clock().uninstall();
       jasmine.clock().install();
     })
   
@@ -92,5 +93,66 @@ describe('PubSub', () => {
       await expectAsync(callbackPromise2).toBeResolved();
       expect(payloadsSent).toEqual(['hello', 'hello']);
     })
+
+    it('calls all subscription callbacks when publish occurs on channel (alt)', async () => {
+      // Arrange
+      let sut = new PubSub();
+      let payloadsSent: string[] = [];
+
+      let {callback:callback1, promise:callbackPromise1} = createCallback(payloadsSent);
+      let {callback:callback2, promise:callbackPromise2} = createCallback(payloadsSent);
+
+      sut.subscribe("channel1", callback1);
+      sut.subscribe("channel1", callback2);
+      // Act
+      await sut.publish("channel1", "hello");
+
+      // Assert
+      await expectAsync(callbackPromise1).toBeResolved();
+      await expectAsync(callbackPromise2).toBeResolved();
+      expect(payloadsSent).toEqual(['hello', 'hello']);
+    })
+
+    function createCallback(payloadsSent: string[]): {callback: (...params: any[]) => any, promise: Promise<any>} {
+      let callback: (...params: any[]) => any = (s) => s;
+      let callbackPromise = new Promise((resolve, reject) => {
+        callback = (payload:string) => {
+          payloadsSent.push(payload);
+          resolve(payload);
+        };
+      });
+      return {callback, promise: callbackPromise};
+    }
+
+
+    it('calls all subscription callbacks when publish occurs on channel (alt2)', async () => {
+      // Arrange
+      let sut = new PubSub();
+      var callback1 = jasmine.createSpy();
+      var callback1WasCalled = callBackWasCalled(callback1);
+
+      var callback2 = jasmine.createSpy();
+      var callback2WasCalled = callBackWasCalled(callback2);
+      
+      sut.subscribe("channel1", callback1);
+      sut.subscribe("channel1", callback2);
+      // Act
+      await sut.publish("channel1", "hello");
+
+      // Assert
+      await callback1WasCalled;
+      expect(callback1).toHaveBeenCalledWith("hello");
+      await callback2WasCalled;
+      expect(callback2).toHaveBeenCalledWith("hello");
+    })
+
+    async function callBackWasCalled(callback: jasmine.Spy) {
+      return new Promise<void>((resolve => {
+        callback.and.callFake((payload) =>
+          resolve()
+        )
+      })) 
+    }
+
   })
 })
